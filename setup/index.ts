@@ -24,6 +24,7 @@ const STEPS: Record<
   onecli: () => import('./onecli.js'),
   auth: () => import('./auth.js'),
   'cli-agent': () => import('./cli-agent.js'),
+  'whatsapp-auth': () => import('./whatsapp-auth.js'),
 };
 
 async function main(): Promise<void> {
