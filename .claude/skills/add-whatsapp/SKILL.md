@@ -203,12 +203,12 @@ Otherwise, run `/manage-channels` to wire this channel to an agent group.
 
 ## Channel Info
 
-- **type**: `whatsapp`
-- **terminology**: WhatsApp calls them "groups" and "chats." A "chat" is a 1:1 DM; a "group" has multiple members.
-- **how-to-find-id**: DMs use `<phone>@s.whatsapp.net` (e.g. `14155551234@s.whatsapp.net`). Groups use `<id>@g.us`. To find your number: `node -e "const c=JSON.parse(require('fs').readFileSync('store/auth/creds.json','utf-8'));console.log(c.me?.id?.split(':')[0]+'@s.whatsapp.net')"`. Groups are auto-discovered — check `pnpm exec tsx scripts/q.ts data/v2.db "SELECT platform_id, name FROM messaging_groups WHERE channel_type='whatsapp' AND is_group=1"`.
-- **supports-threads**: no
-- **typical-use**: Interactive chat — direct messages or small groups
-- **default-isolation**: Same agent group if you're the only participant across multiple chats. Separate agent group if different people are in different groups.
+Remember the user's choice — if **dedicated number**, pass `--dedicated-number` to the register step below.
+
+AskUserQuestion: What trigger word should activate the assistant?
+- **@Andy** - Default trigger
+- **@Claw** - Short and easy
+- **@Claude** - Match the AI name
 
 ### Features
 
@@ -219,7 +219,97 @@ Otherwise, run `/manage-channels` to wire this channel to an agent group.
 - Typing indicators — composing presence updates
 - Credential requests — text fallback (WhatsApp has no modal support)
 
-Not supported (WhatsApp linked device limitation): edit messages, delete messages.
+**Shared number options:**
+- **Self-chat** (Recommended) - Chat in your own "Message Yourself" conversation
+- **Solo group** - A group with just you and the linked device
+- **Existing group** - An existing WhatsApp group
+
+**Dedicated number options:**
+- **DM with bot** (Recommended) - Direct message the bot's number
+- **Solo group** - A group with just you and the bot
+- **Existing group** - An existing WhatsApp group
+
+### Get the JID
+
+**Self-chat:** JID = your phone number with `@s.whatsapp.net`. Extract from auth credentials:
+
+```bash
+node -e "const c=JSON.parse(require('fs').readFileSync('store/auth/creds.json','utf-8'));console.log(c.me?.id?.split(':')[0]+'@s.whatsapp.net')"
+```
+
+**DM with bot:** Ask for the bot's phone number. JID = `NUMBER@s.whatsapp.net`
+
+**Group (solo, existing):** Run group sync and list available groups:
+
+```bash
+npx tsx setup/index.ts --step groups
+npx tsx setup/index.ts --step groups --list
+```
+
+The output shows `JID|GroupName` pairs. Present candidates as AskUserQuestion (names only, not JIDs).
+
+### Register the chat
+
+```bash
+npx tsx setup/index.ts --step register \
+  --jid "<jid>" \
+  --name "<chat-name>" \
+  --trigger "@<trigger>" \
+  --folder "whatsapp_main" \
+  --channel whatsapp \
+  --assistant-name "<name>" \
+  --is-main \
+  --no-trigger-required \  # Only for main/self-chat
+  --dedicated-number       # Only if user chose dedicated number
+```
+
+For additional groups (trigger-required):
+
+```bash
+npx tsx setup/index.ts --step register \
+  --jid "<group-jid>" \
+  --name "<group-name>" \
+  --trigger "@<trigger>" \
+  --folder "whatsapp_<group-name>" \
+  --channel whatsapp
+```
+
+## Phase 5: Verify
+
+### Build and restart
+
+```bash
+npm run build
+```
+
+Restart the service:
+
+```bash
+# macOS (launchd)
+launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+
+# Linux (systemd)
+systemctl --user restart nanoclaw
+
+# Linux (nohup fallback)
+bash start-nanoclaw.sh
+```
+
+### Test the connection
+
+Tell the user:
+
+> Send a message to your registered WhatsApp chat:
+> - For self-chat / main: Any message works
+> - For groups: Use the trigger word (e.g., "@Andy hello")
+>
+> The assistant should respond within a few seconds.
+
+### Check logs if needed
+
+```bash
+tail -f logs/nanoclaw.log
+```
 
 ## Troubleshooting
 
