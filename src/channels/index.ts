@@ -12,6 +12,9 @@ import './cli.js';
 
 // gmail
 
+// imessage
+import './imessage.js';
+
 // slack
 
 // telegram

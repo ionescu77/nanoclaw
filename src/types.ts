@@ -4,41 +4,8 @@ export interface AgentGroup {
   id: string;
   name: string;
   folder: string;
-  trigger: string;
-  added_at: string;
-  containerConfig?: ContainerConfig;
-  requiresTrigger?: boolean; // Default: true for groups, false for solo chats
-  isMain?: boolean; // True for the main control group (no trigger, elevated privileges)
-}
-
-export interface NewMessage {
-  id: string;
-  chat_jid: string;
-  sender: string;
-  sender_name: string;
-  content: string;
-  timestamp: string;
-  is_from_me?: boolean;
-  is_bot_message?: boolean;
-  thread_id?: string;
-  reply_to_message_id?: string;
-  reply_to_message_content?: string;
-  reply_to_sender_name?: string;
-}
-
-export interface ScheduledTask {
-  id: string;
-  group_folder: string;
-  chat_jid: string;
-  prompt: string;
-  script?: string | null;
-  schedule_type: 'cron' | 'interval' | 'once';
-  schedule_value: string;
-  context_mode: 'group' | 'isolated';
-  next_run: string | null;
-  last_run: string | null;
-  last_result: string | null;
-  status: 'active' | 'paused' | 'completed';
+  /** @deprecated Use container_configs.provider instead. */
+  agent_provider: string | null;
   created_at: string;
 }
 
