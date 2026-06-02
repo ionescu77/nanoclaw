@@ -98,6 +98,17 @@ describe('InboundMessage.isMention semantics (#2560)', () => {
     expect(computeIsMention(false, false)).toBe(true);
     expect(computeIsMention(false, true)).toBe(true);
   });
+
+  it('is true for any DM when the bot has its own number', () => {
+    expect(computeIsMention(false, false, { hasOwnNumber: true, isSelfChat: false })).toBe(true);
+    expect(computeIsMention(false, false, { hasOwnNumber: true, isSelfChat: true })).toBe(true);
+  });
+
+  it('is true only for the self-chat when the bot shares the user number', () => {
+    // Friend DMs land here — friends messaging the human, not the bot.
+    expect(computeIsMention(false, false, { hasOwnNumber: false, isSelfChat: false })).toBeUndefined();
+    expect(computeIsMention(false, false, { hasOwnNumber: false, isSelfChat: true })).toBe(true);
+  });
 });
 
 describe('parseWhatsAppMentions', () => {

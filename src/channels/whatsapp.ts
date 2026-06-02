@@ -234,16 +234,28 @@ export function isBotMentionedInGroup(
 
 /**
  * Compute `InboundMessage.isMention` for a WhatsApp message:
- *   - DMs are always mentions (router auto-engages on the bot's behalf).
  *   - Group messages are mentions only when the bot is explicitly tagged.
+ *   - DMs are mentions when the bot has its own phone number (every DM is
+ *     for the bot). When the bot shares the user's number
+ *     (`ASSISTANT_HAS_OWN_NUMBER=false`), only the self-chat counts —
+ *     other DMs are friends messaging the human and must not auto-promote
+ *     into the router's unknown-channel approval flow.
  *
  * Returns `true | undefined` rather than `true | false` because the
  * `InboundMessage` field is `isMention?: boolean` and downstream code
  * treats `undefined` differently than an explicit `false` (#2560).
  */
-export function computeIsMention(isGroup: boolean, botMentionedInGroup: boolean): true | undefined {
-  if (!isGroup) return true;
-  return botMentionedInGroup ? true : undefined;
+export function computeIsMention(
+  isGroup: boolean,
+  botMentionedInGroup: boolean,
+  opts: { isSelfChat?: boolean; hasOwnNumber?: boolean } = {},
+): true | undefined {
+  if (isGroup) return botMentionedInGroup ? true : undefined;
+  // DM. Default `hasOwnNumber=true` preserves the legacy behavior callers
+  // (and existing tests) expect; the inbound construction site passes the
+  // real value from config.
+  if (opts.hasOwnNumber !== false) return true;
+  return opts.isSelfChat ? true : undefined;
 }
 
 /** Map file extension to Baileys media message type. */
@@ -727,16 +739,19 @@ registerChannelAdapter('whatsapp', {
             // on text + caption-bearing messages, matched against the bot's
             // phone JID and LID (#2560).
             const botMentionedInGroup = isGroup && isBotMentionedInGroup(normalized, botPhoneJid, botLidUser);
+            const isSelfChat = botPhoneJid !== undefined && chatJid === botPhoneJid;
 
             const inbound: InboundMessage = {
               id: msg.key.id || `wa-${Date.now()}`,
               kind: 'chat',
-              // DMs are addressed to the bot by definition. Mark them as
-              // platform-confirmed mentions so the router auto-creates an
-              // approval-required messaging_group when the chat is unknown,
-              // instead of silently dropping. In groups, only an explicit
-              // @-mention counts.
-              isMention: computeIsMention(isGroup, botMentionedInGroup),
+              // DMs flag as mention only when the bot has its own number, or
+              // (shared-number install) when this is the self-chat. Friend
+              // DMs to a shared-number bot stay `undefined` so the router
+              // silently returns without auto-creating an approval row.
+              isMention: computeIsMention(isGroup, botMentionedInGroup, {
+                isSelfChat,
+                hasOwnNumber: ASSISTANT_HAS_OWN_NUMBER,
+              }),
               isGroup,
               content: {
                 text: content,
