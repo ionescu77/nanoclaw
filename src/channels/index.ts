@@ -13,7 +13,6 @@ import './cli.js';
 // gmail
 
 // imessage
-import './imessage.js';
 
 // slack
 
@@ -21,4 +20,3 @@ import './imessage.js';
 import './telegram.js';
 
 // whatsapp
-import './whatsapp.js';
