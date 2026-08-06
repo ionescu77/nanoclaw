@@ -21,9 +21,23 @@ import { tryConsume } from './telegram-pairing.js';
  * group engagement can never be sticky-per-thread — 'mention' keeps a group
  * wiring from staying engaged forever in the single shared session.
  */
+// LOCAL DEVIATION from the channels branch: unknownSenderPolicy is 'strict'
+// here, not upstream's 'request_approval'. A Telegram bot username is publicly
+// discoverable, so any stranger can DM it; upstream's default then delivers an
+// approval card to the owner — which lands in the owner's only Telegram DM,
+// i.e. the same private thread the assistant uses. The agent is never woken
+// (channel-approval.ts sends via getDeliveryAdapter, bypassing the session),
+// so this is noise plus a one-tap accept path rather than an exposure. 'strict'
+// denies at the router and records to dropped-messages instead.
+//
+// Admit a real person deliberately: `ncl users create` + `ncl members add`.
+//
+// WARNING: /add-telegram overwrites this file from the channels branch
+// ("overwrite — the branch is canonical"), which silently restores
+// 'request_approval'. Re-apply after any channel re-install or update.
 const TELEGRAM_DEFAULTS: ChannelDefaults = {
-  dm: { engageMode: 'pattern', engagePattern: '.', threads: false, unknownSenderPolicy: 'request_approval' },
-  group: { engageMode: 'mention', threads: false, unknownSenderPolicy: 'request_approval' },
+  dm: { engageMode: 'pattern', engagePattern: '.', threads: false, unknownSenderPolicy: 'strict' },
+  group: { engageMode: 'mention', threads: false, unknownSenderPolicy: 'strict' },
   mentions: 'platform',
 };
 
