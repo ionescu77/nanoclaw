@@ -64,7 +64,7 @@ Run the script directly, not from inside a Claude session — the deterministic 
 
 **What it does:** merges `.env`, seeds the v2 DB from `registered_groups`, copies group folders + session data + scheduled tasks, installs the channel adapters you select, copies channel auth state (including the Baileys keystore for WhatsApp — LID mapping is now resolved per-message by the Baileys v7 adapter, not migrated), builds the agent container.
 
-**What it doesn't:** flip the system service. Pick *"switch to v2"* at the prompt, or do it manually after testing — your v1 install is left untouched.
+**What it doesn't:** flip the system service. Pick _"switch to v2"_ at the prompt, or do it manually after testing — your v1 install is left untouched.
 
 See [docs/v1-to-v2-changes.md](docs/v1-to-v2-changes.md) for what's different and [docs/migration-dev.md](docs/migration-dev.md) for development notes.
 
@@ -145,6 +145,7 @@ Talk to your assistant with the trigger word (default: `@Andy`):
 ```
 
 From a channel you own or administer, you can manage groups and tasks:
+
 ```
 @Andy list all scheduled tasks across groups
 @Andy pause the Monday briefing task
@@ -196,6 +197,7 @@ Two SQLite files per session, each with exactly one writer — no cross-mount co
 For the full architecture writeup see [docs/architecture.md](docs/architecture.md); for the three-level isolation model see [docs/isolation-model.md](docs/isolation-model.md).
 
 Key files:
+
 - `src/index.ts` — entry point: DB init, channel adapters, delivery polls, sweep
 - `src/router.ts` — inbound routing: messaging group → agent group → session → `inbound.db`
 - `src/delivery.ts` — polls `outbound.db`, delivers via adapter, handles system actions
@@ -212,17 +214,18 @@ Key files:
 
 Branch: `fix/codex-http-sse-transport`
 
-This fork disables the Responses WebSocket transport for the Codex provider and
-uses HTTP/SSE instead. It works around intermittent stalled turns where Codex's
+This fork can disable the Responses WebSocket transport for the Codex provider
+and use HTTP/SSE instead. Set `NANOCLAW_CODEX_TRANSPORT=http` in `.env`; unset it
+or use `auto` to retain Codex's native WebSocket behavior. It works around intermittent stalled turns where Codex's
 internal WebSocket retry is invisible to NanoClaw until the turn timeout. The
 symptom is a live, idle container that accepts follow-up messages but produces
 no response until it is stopped and its `continuation:codex` session pointer is
 cleared. See [NanoClaw issue #3338](https://github.com/nanocoai/nanoclaw/issues/3338)
 and [Codex issue #19821](https://github.com/openai/codex/issues/19821).
 
-The patch defines a custom `onecli_openai` model provider in the generated Codex
-`config.toml`, retains OneCLI-managed OpenAI authentication and normal Codex
-thread continuation, and sets `supports_websockets = false`. The implementation
+In `http` mode the patch defines a custom `onecli_openai` model provider in the
+generated Codex `config.toml`, retains OneCLI-managed OpenAI authentication and
+normal Codex thread continuation, and sets `supports_websockets = false`. The implementation
 and regression coverage live in:
 
 - `container/agent-runner/src/providers/codex-app-server.ts`
