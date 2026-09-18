@@ -208,6 +208,44 @@ Key files:
 - `container/agent-runner/` — Bun agent-runner: poll loop, MCP tools, provider abstraction
 - `groups/<folder>/` — per-agent-group filesystem (`CLAUDE.md`, skills, container config)
 
+### Local patch: Codex HTTP/SSE transport
+
+Branch: `fix/codex-http-sse-transport`
+
+This fork disables the Responses WebSocket transport for the Codex provider and
+uses HTTP/SSE instead. It works around intermittent stalled turns where Codex's
+internal WebSocket retry is invisible to NanoClaw until the turn timeout. The
+symptom is a live, idle container that accepts follow-up messages but produces
+no response until it is stopped and its `continuation:codex` session pointer is
+cleared. See [NanoClaw issue #3338](https://github.com/nanocoai/nanoclaw/issues/3338)
+and [Codex issue #19821](https://github.com/openai/codex/issues/19821).
+
+The patch defines a custom `onecli_openai` model provider in the generated Codex
+`config.toml`, retains OneCLI-managed OpenAI authentication and normal Codex
+thread continuation, and sets `supports_websockets = false`. The implementation
+and regression coverage live in:
+
+- `container/agent-runner/src/providers/codex-app-server.ts`
+- `container/agent-runner/src/providers/codex-app-server.test.ts`
+
+Agent-runner source is bind-mounted into new containers, so no image rebuild is
+needed for source-only changes. The patch was initially verified with 23 focused
+Codex provider tests and a live Lilith turn using OneCLI API-key authentication.
+
+After updating NanoClaw, rebase this branch onto the updated private `main`:
+
+```bash
+git switch main
+git pull --ff-only
+git switch fix/codex-http-sse-transport
+git rebase main
+```
+
+Then rerun the focused tests inside the local NanoClaw image and send a small
+message to a Codex-backed agent. If upstream fixes the transport stall, this
+patch can be removed by using updated `main` directly. To roll back without
+rewriting history, revert this branch's patch commit.
+
 ## FAQ
 
 **Why Docker?**

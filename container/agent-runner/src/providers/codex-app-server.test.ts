@@ -45,6 +45,11 @@ describe('Codex config TOML', () => {
         projectDocumentMaxBytes: 32768,
       },
       inference: { model: 'gpt-5', effort: 'medium', fastMode: true },
+      transport: {
+        provider: 'onecli_openai',
+        baseUrl: 'https://api.openai.com/v1',
+        supportsWebsockets: false,
+      },
       memory: { memories: false, useMemories: false, generateMemories: false },
       mcpServers,
     });
@@ -66,9 +71,17 @@ describe('Codex config TOML', () => {
         'sandbox_mode = "danger-full-access"',
         'approval_policy = "never"',
         'project_doc_max_bytes = 32768',
+        'model_provider = "onecli_openai"',
         'model = "gpt-5"',
         'model_reasoning_effort = "medium"',
         'service_tier = "fast"',
+        '',
+        '[model_providers.onecli_openai]',
+        'name = "OpenAI via OneCLI (HTTP/SSE)"',
+        'base_url = "https://api.openai.com/v1"',
+        'wire_api = "responses"',
+        'requires_openai_auth = true',
+        'supports_websockets = false',
         '',
         '[features]',
         'memories = false',
@@ -161,6 +174,10 @@ describe('Codex config TOML', () => {
     expect(content).toContain('sandbox_mode = "danger-full-access"');
     expect(content).toContain('approval_policy = "never"');
     expect(content).toContain('project_doc_max_bytes = 32768');
+    expect(content).toContain('model_provider = "onecli_openai"');
+    expect(content).toContain('[model_providers.onecli_openai]');
+    expect(content).toContain('requires_openai_auth = true');
+    expect(content).toContain('supports_websockets = false');
     expect(content).toContain('model = "gpt-5"');
     expect(content).toContain('model_reasoning_effort = "medium"');
     expect(content).toContain('service_tier = "fast"');
