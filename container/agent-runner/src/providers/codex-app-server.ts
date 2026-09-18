@@ -429,6 +429,7 @@ export interface CodexConfigPlan {
   };
   inference: { model?: string; effort?: string; fastMode?: boolean };
   transport: {
+    mode: 'auto' | 'http';
     provider: string;
     baseUrl: string;
     supportsWebsockets: false;
@@ -477,10 +478,15 @@ export function buildCodexConfigPlan(
   servers: Record<string, McpServerConfig>,
   opts: { model?: string; effort?: string; fastMode?: boolean } = {},
 ): CodexConfigPlan {
+  const configuredTransport = process.env.NANOCLAW_CODEX_TRANSPORT?.trim().toLowerCase() || 'auto';
+  if (configuredTransport !== 'auto' && configuredTransport !== 'http') {
+    throw new Error(`NANOCLAW_CODEX_TRANSPORT must be "auto" or "http", got "${configuredTransport}"`);
+  }
   return {
     executionPolicy: codexExecutionPolicySection(),
     inference: opts,
     transport: {
+      mode: configuredTransport,
       provider: CODEX_MODEL_PROVIDER,
       baseUrl: 'https://api.openai.com/v1',
       supportsWebsockets: false,
@@ -496,8 +502,8 @@ export function renderCodexConfigToml(plan: CodexConfigPlan): string {
     `sandbox_mode = ${tomlBasicString(plan.executionPolicy.sandboxMode)}`,
     `approval_policy = ${tomlBasicString(plan.executionPolicy.approvalPolicy)}`,
     `project_doc_max_bytes = ${plan.executionPolicy.projectDocumentMaxBytes}`,
-    `model_provider = ${tomlBasicString(plan.transport.provider)}`,
   ];
+  if (plan.transport.mode === 'http') lines.push(`model_provider = ${tomlBasicString(plan.transport.provider)}`);
   if (plan.inference.model) lines.push(`model = ${tomlBasicString(plan.inference.model)}`);
   if (plan.inference.effort) lines.push(`model_reasoning_effort = ${tomlBasicString(plan.inference.effort)}`);
   if (plan.inference.fastMode) lines.push('service_tier = "fast"');
@@ -506,14 +512,16 @@ export function renderCodexConfigToml(plan: CodexConfigPlan): string {
   // Force Responses over HTTP/SSE. The built-in OpenAI provider cannot be
   // overridden, so use an equivalent custom provider; requires_openai_auth
   // keeps the OneCLI-managed auth.json stub as the credential source.
-  const provider = tomlKey(plan.transport.provider);
-  lines.push(`[model_providers.${provider}]`);
-  lines.push('name = "OpenAI via OneCLI (HTTP/SSE)"');
-  lines.push(`base_url = ${tomlBasicString(plan.transport.baseUrl)}`);
-  lines.push('wire_api = "responses"');
-  lines.push('requires_openai_auth = true');
-  lines.push(`supports_websockets = ${plan.transport.supportsWebsockets}`);
-  lines.push('');
+  if (plan.transport.mode === 'http') {
+    const provider = tomlKey(plan.transport.provider);
+    lines.push(`[model_providers.${provider}]`);
+    lines.push('name = "OpenAI via OneCLI (HTTP/SSE)"');
+    lines.push(`base_url = ${tomlBasicString(plan.transport.baseUrl)}`);
+    lines.push('wire_api = "responses"');
+    lines.push('requires_openai_auth = true');
+    lines.push(`supports_websockets = ${plan.transport.supportsWebsockets}`);
+    lines.push('');
+  }
 
   // NanoClaw owns persistent memory across providers. Keep Codex's native
   // memory disabled even if its defaults or a user-level config change.

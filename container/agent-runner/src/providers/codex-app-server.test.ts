@@ -24,9 +24,12 @@ const MEMORY_SESSION_HOOK = {
 
 let tmpHome: string | null = null;
 const originalHome = process.env.HOME;
+const originalTransport = process.env.NANOCLAW_CODEX_TRANSPORT;
 
 afterEach(() => {
   process.env.HOME = originalHome;
+  if (originalTransport === undefined) delete process.env.NANOCLAW_CODEX_TRANSPORT;
+  else process.env.NANOCLAW_CODEX_TRANSPORT = originalTransport;
   if (tmpHome) {
     fs.rmSync(tmpHome, { recursive: true, force: true });
     tmpHome = null;
@@ -35,6 +38,7 @@ afterEach(() => {
 
 describe('Codex config TOML', () => {
   it('builds every declared configuration capability before rendering', () => {
+    delete process.env.NANOCLAW_CODEX_TRANSPORT;
     const mcpServers = { nanoclaw: { command: 'bun', args: ['run', 'server.ts'] } };
     const plan = buildCodexConfigPlan(mcpServers, { model: 'gpt-5', effort: 'medium', fastMode: true });
 
@@ -46,6 +50,7 @@ describe('Codex config TOML', () => {
       },
       inference: { model: 'gpt-5', effort: 'medium', fastMode: true },
       transport: {
+        mode: 'auto',
         provider: 'onecli_openai',
         baseUrl: 'https://api.openai.com/v1',
         supportsWebsockets: false,
@@ -57,6 +62,7 @@ describe('Codex config TOML', () => {
   });
 
   it('renders the exact bytes, pinning line order and the trailing newline', () => {
+    process.env.NANOCLAW_CODEX_TRANSPORT = 'http';
     const content = renderCodexConfigToml(
       buildCodexConfigPlan(
         {
@@ -105,6 +111,23 @@ describe('Codex config TOML', () => {
     );
   });
 
+  it('keeps native transport by default and emits the custom provider only in http mode', () => {
+    delete process.env.NANOCLAW_CODEX_TRANSPORT;
+    const automatic = renderCodexConfigToml(buildCodexConfigPlan({}, {}));
+    expect(automatic).not.toContain('model_provider =');
+    expect(automatic).not.toContain('[model_providers.onecli_openai]');
+
+    process.env.NANOCLAW_CODEX_TRANSPORT = 'http';
+    const http = renderCodexConfigToml(buildCodexConfigPlan({}, {}));
+    expect(http).toContain('model_provider = "onecli_openai"');
+    expect(http).toContain('supports_websockets = false');
+  });
+
+  it('rejects an invalid transport value', () => {
+    process.env.NANOCLAW_CODEX_TRANSPORT = 'websockets-off-ish';
+    expect(() => buildCodexConfigPlan({}, {})).toThrow(/must be "auto" or "http"/);
+  });
+
   // Core's speed property → Codex's service tier. `fast` is the only value
   // with a Codex rendering; `standard` (the core default) and anything else
   // emit no tier line, so Codex's own default serving tier stays in force.
@@ -150,6 +173,7 @@ describe('Codex config TOML', () => {
   });
 
   it('hardcodes danger-full-access + never and writes model, effort, fast mode, and MCP servers', () => {
+    process.env.NANOCLAW_CODEX_TRANSPORT = 'http';
     tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-home-'));
     process.env.HOME = tmpHome;
 
